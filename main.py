@@ -25,27 +25,43 @@ def get_default_branch(owner: str, repo: str) -> str:
 def clear_dest_dir(dest_dir: str):
     """
     Remove all files/folders under dest_dir, except the currently running
-    script itself (in case it lives inside dest_dir).
+    script itself (in case it lives inside dest_dir) and any .git directory
+    (never touch git's internal data).
     """
+    import stat
+ 
     script_path = os.path.abspath(__file__)
  
     if not os.path.isdir(dest_dir):
         return
  
-    for root, dirs, files in os.walk(dest_dir, topdown=False):
+    for root, dirs, files in os.walk(dest_dir, topdown=True):
+        # Don't descend into .git at all
+        dirs[:] = [d for d in dirs if d != ".git"]
+ 
         for name in files:
             file_path = os.path.join(root, name)
             if os.path.abspath(file_path) == script_path:
                 continue  # never delete the running script
-            os.remove(file_path)
+            try:
+                os.remove(file_path)
+            except PermissionError:
+                # Windows sometimes marks files read-only; clear the flag and retry
+                try:
+                    os.chmod(file_path, stat.S_IWRITE)
+                    os.remove(file_path)
+                except OSError as e:
+                    print(f"Warning: could not delete {file_path} ({e})")
  
-        # remove now-empty directories (skip dest_dir itself)
+    # Second pass, bottom-up, to remove now-empty directories
+    for root, dirs, files in os.walk(dest_dir, topdown=False):
+        if ".git" in os.path.relpath(root, dest_dir).split(os.sep):
+            continue  # skip anything under .git
         if os.path.abspath(root) != os.path.abspath(dest_dir):
             try:
                 os.rmdir(root)
             except OSError:
-                pass  # not empty (probably because we skipped the script file)
- 
+                pass  # not empty (e.g. contains the script, or .git) 
  
 def sync_repo(owner: str, repo: str, dest_dir: str, branch: str = None):
     """
@@ -91,9 +107,10 @@ def sync_repo(owner: str, repo: str, dest_dir: str, branch: str = None):
  
     print(f"\nDone. Files saved to: {os.path.abspath(dest_dir)}")
 
+
 if activeData["version"] != repoData["version"]:
     print("Need to fetch newer version")
-    sync_repo("maxtenton", "HallShareV2", "./")
+    sync_repo("maxtenton", "HallShareV2", "./", branch="master")
         
 else:
     print("Version is latest")

@@ -1,0 +1,3 @@
+publish.bat
+commit_and_push.bat
+bump_version.ps1

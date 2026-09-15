@@ -110,7 +110,7 @@ def sync_repo(owner: str, repo: str, dest_dir: str, branch: str = None):
 
 if activeData["version"] != repoData["version"]:
     print("Need to fetch newer version")
-    sync_repo("maxtenton", "HallShareV2", "./", branch="master")
+    sync_repo("maxtenton", "HallFileShareV2", "./", branch="master")
         
 else:
     print("Version is latest")

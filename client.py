@@ -33,7 +33,6 @@ def _read_file(path: str) -> bytes:
 
 
 def _chunk_list(items, n):
-    """Split items into up to n roughly-equal, non-empty chunks."""
     if n <= 0:
         n = 1
     n = min(n, len(items)) or 1
@@ -50,7 +49,6 @@ def _chunk_list(items, n):
 
 
 async def fetch_list(target_ip: str) -> list[str]:
-    """Open a LIST connection and retrieve the server's full file tree."""
     reader, writer = await asyncio.open_connection(target_ip, PORT)
     try:
         greeting = await recv_line(reader)
@@ -75,7 +73,6 @@ async def fetch_list(target_ip: str) -> list[str]:
 
 
 async def fetch_worker(target_ip: str, files_chunk: list[str], base_path: str, worker_id: int):
-    """Open one FETCH connection and download this worker's slice of files."""
     if not files_chunk:
         return
 
@@ -118,11 +115,6 @@ async def fetch_worker(target_ip: str, files_chunk: list[str], base_path: str, w
 
 
 async def push_worker(target_ip: str, files_chunk: list[str], base_path: str, worker_id: int):
-    """Open one PUSH connection and upload this worker's slice of files.
-
-    Mirror image of fetch_worker: here the client is the sender and the
-    server is the receiver.
-    """
     if not files_chunk:
         return
 

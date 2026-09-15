@@ -12,15 +12,10 @@ load_dotenv()
 
 PORT = 8080
 
-# Set TEST_SERVER=1 in .env when running the server on the same machine as
-# the client for testing - this suffixes the shared folder with "Server" so
-# the two don't collide.
 TEST_SERVER = os.getenv("TEST_SERVER", "0") == "1"
 
 BASE_DIR = CLibs.PathTools.getPath(bTestServer=TEST_SERVER)  # server's base file directory
 
-# Blocking disk reads run here so they don't block the asyncio event loop
-# while other connections are mid-transfer.
 DISK_THREADS = int(os.getenv("SERVER_THREADS", "4"))
 executor = ThreadPoolExecutor(max_workers=DISK_THREADS, thread_name_prefix="disk-io")
 
@@ -37,7 +32,6 @@ def _write_file(path: str, data: bytes):
 
 
 async def handle_list(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Send the full remote file tree to the client."""
     loop = asyncio.get_running_loop()
     files = await loop.run_in_executor(
         executor, functools.partial(fileCheck.getFullFileTree, bTestServer=TEST_SERVER)
@@ -55,12 +49,6 @@ async def handle_list(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
 
 
 async def handle_fetch(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Receive a batch of requested filenames and stream their contents back.
-
-    A single client may open several FETCH connections concurrently, each
-    carrying a different slice of the missing-file list — that's what
-    parallelizes the transfer.
-    """
     loop = asyncio.get_running_loop()
 
     file_amnt = int(await recv_line(reader))
@@ -93,13 +81,6 @@ async def handle_fetch(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
 
 
 async def handle_push(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Receive a batch of filenames + contents from the client and write
-    them into BASE_DIR. This is the mirror image of handle_fetch: here the
-    client is the sender and the server is the receiver.
-
-    A single client may open several PUSH connections concurrently, each
-    uploading a different slice of the files the server is missing.
-    """
     loop = asyncio.get_running_loop()
 
     file_amnt = int(await recv_line(reader))
@@ -161,9 +142,6 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
 
 
 async def main(target_ip: str | None = None):
-    # Bind to all interfaces by default so the server doesn't depend on
-    # correctly guessing "the" LAN IP - that only matters for what you tell
-    # clients to connect to, not what the socket binds to.
     bind_ip = target_ip or "0.0.0.0"
     server = await asyncio.start_server(handle_connection, bind_ip, PORT)
 

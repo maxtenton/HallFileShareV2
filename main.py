@@ -15,7 +15,6 @@ with open("version_info.json", "r") as f:
     activeData = json.loads(f.read())
 
 def get_default_branch(owner: str, repo: str) -> str:
-    """Look up the repo's default branch (main, master, etc.)."""
     url = f"https://api.github.com/repos/{owner}/{repo}"
     resp = requests.get(url)
     resp.raise_for_status()
@@ -23,11 +22,6 @@ def get_default_branch(owner: str, repo: str) -> str:
  
  
 def clear_dest_dir(dest_dir: str):
-    """
-    Remove all files/folders under dest_dir, except the currently running
-    script itself (in case it lives inside dest_dir) and any .git directory
-    (never touch git's internal data).
-    """
     import stat
  
     script_path = os.path.abspath(__file__)
@@ -36,40 +30,31 @@ def clear_dest_dir(dest_dir: str):
         return
  
     for root, dirs, files in os.walk(dest_dir, topdown=True):
-        # Don't descend into .git at all
         dirs[:] = [d for d in dirs if d != ".git"]
  
         for name in files:
             file_path = os.path.join(root, name)
             if os.path.abspath(file_path) == script_path:
-                continue  # never delete the running script
+                continue
             try:
                 os.remove(file_path)
             except PermissionError:
-                # Windows sometimes marks files read-only; clear the flag and retry
                 try:
                     os.chmod(file_path, stat.S_IWRITE)
                     os.remove(file_path)
                 except OSError as e:
                     print(f"Warning: could not delete {file_path} ({e})")
  
-    # Second pass, bottom-up, to remove now-empty directories
     for root, dirs, files in os.walk(dest_dir, topdown=False):
         if ".git" in os.path.relpath(root, dest_dir).split(os.sep):
-            continue  # skip anything under .git
+            continue 
         if os.path.abspath(root) != os.path.abspath(dest_dir):
             try:
                 os.rmdir(root)
             except OSError:
-                pass  # not empty (e.g. contains the script, or .git) 
+                pass
  
 def sync_repo(owner: str, repo: str, dest_dir: str, branch: str = None):
-    """
-    Replace the contents of dest_dir with every file in a public GitHub
-    repo, preserving the repo's folder structure. Any existing files in
-    dest_dir are deleted first, except the script currently running this
-    sync (so you can safely run it from inside dest_dir).
-    """
     if branch is None:
         branch = get_default_branch(owner, repo)
         print(f"Using default branch: {branch}")

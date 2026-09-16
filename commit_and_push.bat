@@ -18,7 +18,13 @@ if errorlevel 1 (
     echo Failed to update version_info.json. Aborting commit.
     exit /b 1
 )
-
+call build.bat
+cd output/main
+git add -A
+git commit -m "%commitMsg%"
+git push
+cd .. 
+cd ..
 git add -A
 git commit -m "%commitMsg%"
 git push

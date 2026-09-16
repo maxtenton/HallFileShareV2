@@ -11,13 +11,8 @@ from dotenv import load_dotenv
 load_dotenv()
 PORT = 8080
 
-# How many parallel connections to use for downloading files.
-# Override with the CLIENT_WORKERS env var if you want to tune it.
 NUM_WORKERS = int(os.getenv("CLIENT_WORKERS", "4"))
 
-# Set TEST_CLIENT=1 in .env when running the client on the same machine as
-# the server for testing - this suffixes the shared folder with "Client" so
-# the two don't collide.
 TEST_CLIENT = os.getenv("TEST_CLIENT", "0") == "1"
 
 
@@ -82,7 +77,6 @@ async def fetch_worker(target_ip: str, files_chunk: list[str], base_path: str, w
         await recv_line(reader)  # greeting
         await send_all(writer, b'FETCH\n')
 
-        # Tell the server which files this connection wants.
         await send_length(writer, len(files_chunk))
         await recv_line(reader)  # ACK_AMNT
 
@@ -93,7 +87,6 @@ async def fetch_worker(target_ip: str, files_chunk: list[str], base_path: str, w
             await send_all(writer, encoded)
             await recv_line(reader)          # ACK_NAME
 
-        # Receive the actual file contents.
         for name in files_chunk:
             file_len = int(await recv_line(reader))
             await send_all(writer, b'Received')
@@ -106,7 +99,6 @@ async def fetch_worker(target_ip: str, files_chunk: list[str], base_path: str, w
             await send_all(writer, b'Received')
 
             out_path = os.path.join(base_path, name)
-            # Offload the blocking disk write to a thread.
             await loop.run_in_executor(None, _write_file, out_path, data)
             print(f"[worker {worker_id}] received {name} ({file_len} bytes)")
     finally:
@@ -124,7 +116,6 @@ async def push_worker(target_ip: str, files_chunk: list[str], base_path: str, wo
         await recv_line(reader)  # greeting
         await send_all(writer, b'PUSH\n')
 
-        # Tell the server which files this connection is about to send.
         await send_length(writer, len(files_chunk))
         await recv_line(reader)  # ACK_AMNT
 
@@ -135,7 +126,6 @@ async def push_worker(target_ip: str, files_chunk: list[str], base_path: str, wo
             await send_all(writer, encoded)
             await recv_line(reader)          # ACK_NAME
 
-        # Send the actual file contents.
         for name in files_chunk:
             full_path = os.path.join(base_path, name)
             try:
@@ -164,7 +154,6 @@ async def start(TARGET: str = "127.0.0.1"):
         server_files = await fetch_list(TARGET)
         print(f"Server has {len(server_files)} files.")
 
-        # Building the local file tree is blocking (os.walk) - run it in a thread.
         local_tree = await loop.run_in_executor(
             None, functools.partial(fileCheck.getFullFileTree, bTestClient=TEST_CLIENT)
         )

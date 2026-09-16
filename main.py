@@ -143,7 +143,7 @@ Start-Sleep -Seconds 1   # let Windows release the file lock on the old exe
 
 # Files/folders at the root of $RootDir that should never be touched
 # (e.g. local machine config that isn't tracked in the repo)
-$preserve = @("")
+$preserve = @()
 
 Write-Log "Clearing $RootDir (preserving: $($preserve -join ', '))..."
 Get-ChildItem -Path $RootDir -Force | ForEach-Object {
@@ -238,29 +238,69 @@ def run_target():
         subprocess.run(["python", "client.py"])
 
 
-if is_frozen():
-    owner, repo = FROZEN_OWNER, FROZEN_REPO
-    version_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{BRANCH}/version_info.json"
-    repoData = fetch_json(version_url)
-    activeData = load_json("version_info.json")
+def main():
+    if is_frozen():
+        owner, repo = FROZEN_OWNER, FROZEN_REPO
+        # PyInstaller 6.x --onedir builds place bundled data (including --add-data
+        # files) inside an "_internal" subfolder by default. sys._MEIPASS points
+        # at that folder at runtime, even if it's ever renamed via --contents-directory.
+        internal_dir = getattr(sys, "_MEIPASS", os.path.join(
+            os.path.dirname(os.path.abspath(sys.executable)), "_internal"
+        ))
+        version_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{BRANCH}/_internal/version_info.json"
+        repoData = fetch_json(version_url)
+        activeData = load_json(os.path.join(internal_dir, "version_info.json"))
 
-    if activeData["version"] != repoData["version"]:
-        print("Newer version available - handing off to updater...")
-        trigger_update_and_exit(owner, repo, BRANCH)
-        # trigger_update_and_exit calls sys.exit(); nothing below runs
+        if activeData["version"] != repoData["version"]:
+            print("Newer version available - handing off to updater...")
+            trigger_update_and_exit(owner, repo, BRANCH)
+            # trigger_update_and_exit calls sys.exit(); nothing below runs
+        else:
+            print("Version is latest")
+            run_target()
+
     else:
-        print("Version is latest")
-        run_target()
+        owner, repo = SOURCE_OWNER, SOURCE_REPO
+        version_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{BRANCH}/version_info.json"
+        repoData = fetch_json(version_url)
+        activeData = load_json("version_info.json")
 
-else:
-    owner, repo = SOURCE_OWNER, SOURCE_REPO
-    version_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{BRANCH}/version_info.json"
-    repoData = fetch_json(version_url)
-    activeData = load_json("version_info.json")
+        if activeData["version"] != repoData["version"]:
+            print("Need to fetch newer version")
+            sync_repo(owner, repo, "./", branch=BRANCH)
+        else:
+            print("Version is latest")
+            run_target()
 
-    if activeData["version"] != repoData["version"]:
-        print("Need to fetch newer version")
-        sync_repo(owner, repo, "./", branch=BRANCH)
-    else:
-        print("Version is latest")
-        run_target()
+
+if __name__ == "__main__":
+    try:
+        main()
+    except SystemExit:
+        raise  # normal exits (e.g. from trigger_update_and_exit) pass through untouched
+    except Exception:
+        import traceback
+
+        error_text = traceback.format_exc()
+        print("\n" + "=" * 60)
+        print("FATAL ERROR:")
+        print(error_text)
+        print("=" * 60)
+
+        # Always log to a file next to the exe/script, so the error survives
+        # even if the console window closes before you can read it
+        log_dir = os.path.dirname(os.path.abspath(sys.executable if is_frozen() else __file__))
+        log_path = os.path.join(log_dir, "error_log.txt")
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                import datetime
+                f.write(f"\n--- {datetime.datetime.now().isoformat()} ---\n")
+                f.write(error_text)
+            print(f"This error was also saved to: {log_path}")
+        except OSError:
+            pass
+
+        if is_frozen():
+            # Keep the window open so a double-clicked .exe doesn't just vanish
+            input("\nPress Enter to close this window...")
+        sys.exit(1)

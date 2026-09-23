@@ -6,6 +6,7 @@ import subprocess
 from dotenv import load_dotenv
 from socket import gethostname
 from CLibs import Logger
+import asyncio
 
 global infile
 infile = "main.py"
@@ -83,9 +84,11 @@ def run_target():
     target = os.getenv("TARGET")
     Print( text =f"Hostname: {gethostname()}")
     if target == gethostname():
-        subprocess.run(["python", "server.py"])
+        import server
+        asyncio.run(server.main())
     else:
-        subprocess.run(["python", "client.py"])
+        import client
+        asyncio.run(client.start())
 
 
 def main():

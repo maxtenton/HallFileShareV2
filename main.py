@@ -64,14 +64,14 @@ def run_installer_and_exit():
 
     Print( text =f"Launching installer: {installer_path}")
     subprocess.Popen(
-        [
-            "powershell",
-            "-NoProfile",
-            "-ExecutionPolicy", "Bypass",
-            "-File", installer_path,
-        ],
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
-    )
+    [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", installer_path,
+    ],
+    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW,
+)
 
     Print( text ="Installer launched. Exiting so it can update files...")
     sys.exit(0)

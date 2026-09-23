@@ -133,5 +133,3 @@ if ($hasPy) {
 if (-not $updatedSomething) {
     Write-Log "Everything is already up to date."
 }
-
-Read-Host "`nPress Enter to exit"

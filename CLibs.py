@@ -1,6 +1,7 @@
 import os
 import pathlib
 import socket
+import datetime
 
 folderInUser = "HallFileShare"
 
@@ -67,3 +68,17 @@ class NetTools:
             "Could not detect a local IP address. Pass an IP explicitly "
             "instead of relying on auto-detection (e.g. server.main(target_ip=...))."
         )
+
+
+class Logger:
+
+
+    def getCurrentTime(self):
+        x = datetime.datetime.now()
+        dateFormatted = x.strftime("%d.%m.%Y : %H:%M:%S")
+        return dateFormatted
+
+    def print(self, string : str, file : str):
+        print(string)
+        with open("main.log", "a") as f:
+            f.write(f"[{self.getCurrentTime()}] [{file}] : {string}\n")

@@ -35,6 +35,7 @@ pyinstaller --onedir --name main --distpath "%BUILD_DISTPATH%" --workpath ./buil
   --add-data "fileCheck.py;." ^
   --add-data "protocol.py;." ^
   --add-data "server.py;." ^
+  --add-data "github_sync.py;." ^
   --add-data "version_info.json;." ^
   main.py
 
@@ -56,6 +57,11 @@ if errorlevel 1 (
     exit /b 1
 )
 rmdir "%BUILD_DISTPATH%" 2>nul
+
+rem installer.ps1/.bat must sit directly next to main.exe (NOT inside _internal),
+rem so copy them in directly rather than via --add-data
+copy /y "installer.ps1" "%STAGING_DIR%\installer.ps1" >nul
+copy /y "installer.bat" "%STAGING_DIR%\installer.bat" >nul
 
 if exist "%OUTPUT_DIR%\.git" (
     echo Carrying over existing .git into the new build...

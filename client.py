@@ -4,9 +4,18 @@ import os
 import socket
 
 import CLibs
+from CLibs import Logger
 import fileCheck
 from protocol import send_all, recv_exact, recv_line, send_length
 from dotenv import load_dotenv
+
+global infile
+infile = "client.py"
+global Log
+Log = Logger()
+
+def Print(text : str) : 
+    Log.print(string = f"{text}", file = infile)
 
 load_dotenv()
 PORT = 8080
@@ -47,7 +56,7 @@ async def fetch_list(target_ip: str) -> list[str]:
     reader, writer = await asyncio.open_connection(target_ip, PORT)
     try:
         greeting = await recv_line(reader)
-        print(greeting)
+        Print( text = greeting)
         await send_all(writer, b'LIST\n')
 
         file_amnt = int(await recv_line(reader))
@@ -92,7 +101,7 @@ async def fetch_worker(target_ip: str, files_chunk: list[str], base_path: str, w
             await send_all(writer, b'Received')
 
             if file_len == 0:
-                print(f"[worker {worker_id}] server could not provide: {name}")
+                Print( text = f"[worker {worker_id}] server could not provide: {name}")
                 continue
 
             data = await recv_exact(reader, file_len)
@@ -100,7 +109,7 @@ async def fetch_worker(target_ip: str, files_chunk: list[str], base_path: str, w
 
             out_path = os.path.join(base_path, name)
             await loop.run_in_executor(None, _write_file, out_path, data)
-            print(f"[worker {worker_id}] received {name} ({file_len} bytes)")
+            Print( text = f"[worker {worker_id}] received {name} ({file_len} bytes)")
     finally:
         writer.close()
         await writer.wait_closed()
@@ -131,7 +140,7 @@ async def push_worker(target_ip: str, files_chunk: list[str], base_path: str, wo
             try:
                 data = await loop.run_in_executor(None, _read_file, full_path)
             except FileNotFoundError:
-                print(f"[push {worker_id}] local file vanished before send: {name}")
+                Print( text = f"[push {worker_id}] local file vanished before send: {name}")
                 await send_length(writer, 0)
                 await recv_line(reader)
                 continue
@@ -140,7 +149,7 @@ async def push_worker(target_ip: str, files_chunk: list[str], base_path: str, wo
             await recv_line(reader)          # ack before data
             await send_all(writer, data)
             await recv_line(reader)          # ack after data
-            print(f"[push {worker_id}] sent {name} ({len(data)} bytes)")
+            Print( text = f"[push {worker_id}] sent {name} ({len(data)} bytes)")
     finally:
         writer.close()
         await writer.wait_closed()
@@ -150,22 +159,22 @@ async def start(TARGET: str = "127.0.0.1"):
     loop = asyncio.get_running_loop()
 
     try:
-        print(f"Connecting to {TARGET}:{PORT}...")
+        Print( text = f"Connecting to {TARGET}:{PORT}...")
         server_files = await fetch_list(TARGET)
-        print(f"Server has {len(server_files)} files.")
+        Print( text = f"Server has {len(server_files)} files.")
 
         local_tree = await loop.run_in_executor(
             None, functools.partial(fileCheck.getFullFileTree, bTestClient=TEST_CLIENT)
         )
-        print(f"We have {len(local_tree)} files locally.")
+        Print( text = f"We have {len(local_tree)} files locally.")
 
         missing_locally = fileCheck.checkMissingFiles(local_tree, server_files)
         missing_remotely = fileCheck.checkFilesToPush(local_tree, server_files)
-        print(f"We are missing {len(missing_locally)} files (will download).")
-        print(f"Server is missing {len(missing_remotely)} files (will upload).")
+        Print( text = f"We are missing {len(missing_locally)} files (will download).")
+        Print( text = f"Server is missing {len(missing_remotely)} files (will upload).")
 
         if not missing_locally and not missing_remotely:
-            print("Already in sync.")
+            Print( text = "Already in sync.")
             return
 
         base_path = CLibs.PathTools.getPath(bTestClient=TEST_CLIENT)
@@ -181,18 +190,17 @@ async def start(TARGET: str = "127.0.0.1"):
             for i, chunk in enumerate(push_chunks)
         ]
 
-        print(
-            f"Syncing with {len(tasks)} parallel connection(s) "
-            f"({len(fetch_chunks)} download, {len(push_chunks)} upload)..."
+        Print( text = f"Syncing with {len(tasks)} parallel connection(s) ")
+        Print( text = f"({len(fetch_chunks)} download, {len(push_chunks)} upload)..."
         )
         await asyncio.gather(*tasks)
 
-        print("Sync complete.")
+        Print( text = "Sync complete.")
 
     except ConnectionRefusedError:
-        print(f"Error: Could not connect to {TARGET}:{PORT}. Is the server running?")
+        Print( text = f"Error: Could not connect to {TARGET}:{PORT}. Is the server running?")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        Print( text = f"An error occurred: {e}")
 
 
 if __name__ == "__main__":

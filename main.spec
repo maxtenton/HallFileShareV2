@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('.env', '.'), ('CLibs.py', '.'), ('client.py', '.'), ('fileCheck.py', '.'), ('protocol.py', '.'), ('server.py', '.'), ('version_info.json', '.')],
+    datas=[('.env', '.'), ('CLibs.py', '.'), ('client.py', '.'), ('fileCheck.py', '.'), ('protocol.py', '.'), ('server.py', '.'), ('github_sync.py', '.'), ('version_info.json', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

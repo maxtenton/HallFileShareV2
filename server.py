@@ -4,9 +4,15 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 import CLibs
+from CLibs import Logger
 import fileCheck
 from protocol import send_all, recv_exact, recv_line, send_length
 from dotenv import load_dotenv
+
+global infile
+infile = "server.py"
+global Log
+Log = Logger()
 
 load_dotenv()
 
@@ -63,7 +69,7 @@ async def handle_fetch(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
         requested.append(name)
 
     peer = writer.get_extra_info('peername')
-    print(f"[{peer}] fetch worker requested {len(requested)} files")
+    Log.print(string = f"[{peer}] fetch worker requested {len(requested)} files", file = infile)
 
     for name in requested:
         full_path = os.path.join(BASE_DIR, name)
@@ -73,9 +79,9 @@ async def handle_fetch(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
             await reader.read(1024)      # ACK
             await send_all(writer, data)
             await reader.read(1024)      # ACK
-            print(f"[{peer}] sent {name} ({len(data)} bytes)")
+            Log.print(string = f"[{peer}] sent {name} ({len(data)} bytes)", file = infile)
         except FileNotFoundError:
-            print(f"[{peer}] not found: {full_path}")
+            Log.print(string = f"[{peer}] not found: {full_path}", file = infile)
             await send_length(writer, 0)
             await reader.read(1024)
 
@@ -95,14 +101,14 @@ async def handle_push(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
         names.append(name)
 
     peer = writer.get_extra_info('peername')
-    print(f"[{peer}] push worker will receive {len(names)} files")
+    Log.print(string = f"[{peer}] push worker will receive {len(names)} files", file = infile)
 
     for name in names:
         file_len = int(await recv_line(reader))
         await send_all(writer, b'Received\n')  # must be newline-terminated: client reads acks via recv_line()
 
         if file_len == 0:
-            print(f"[{peer}] client had no data for {name}, skipping")
+            Log.print(string = f"[{peer}] client had no data for {name}, skipping", file = infile)
             continue
 
         data = await recv_exact(reader, file_len)
@@ -110,12 +116,12 @@ async def handle_push(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
 
         out_path = os.path.join(BASE_DIR, name)
         await loop.run_in_executor(executor, _write_file, out_path, data)
-        print(f"[{peer}] stored {name} ({file_len} bytes)")
+        Log.print(string = f"[{peer}] stored {name} ({file_len} bytes)", file = infile)
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     peer = writer.get_extra_info('peername')
-    print(f"Connection from {peer}")
+    Log.print(string = f"Connection from {peer}", file = infile)
     try:
         await send_all(writer, b'Connection established\n')
         role = (await recv_line(reader)).upper()
@@ -127,18 +133,18 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
         elif role == 'PUSH':
             await handle_push(reader, writer)
         else:
-            print(f"[{peer}] unknown role '{role}', closing")
+            Log.print(f"[{peer}] unknown role '{role}', closing", infile)
     except (asyncio.IncompleteReadError, ConnectionError, RuntimeError) as e:
-        print(f"[{peer}] connection error: {e}")
+        Log.print(string = f"[{peer}] connection error: {e}", file = infile)
     except Exception as e:
-        print(f"[{peer}] unexpected error: {e}")
+        Log.print(string = f"[{peer}] unexpected error: {e}", file = infile)
     finally:
         writer.close()
         try:
             await writer.wait_closed()
         except Exception:
             pass
-        print(f"[{peer}] connection closed")
+        Log.print(string = f"[{peer}] connection closed", file = infile)
 
 
 async def main(target_ip: str | None = None):
@@ -147,12 +153,12 @@ async def main(target_ip: str | None = None):
 
     try:
         detected_ip = CLibs.NetTools.getLocalIP()
-        print(f"Server listening on {bind_ip}:{PORT} (reachable at {detected_ip}:{PORT} on your LAN)")
+        Log.print(string = f"Server listening on {bind_ip}:{PORT} (reachable at {detected_ip}:{PORT} on your LAN)", file = infile)
     except RuntimeError:
-        print(f"Server listening on {bind_ip}:{PORT}")
-        print("(Could not auto-detect a LAN IP - check your network settings if clients can't connect.)")
+        Log.print(string = f"Server listening on {bind_ip}:{PORT}", file = infile)
+        Log.print(string = "(Could not auto-detect a LAN IP - check your network settings if clients can't connect.)", file = infile)
 
-    print("Serving multiple concurrent connections (LIST + parallel FETCH workers).")
+    Log.print(string = "Serving multiple concurrent connections (LIST + parallel FETCH workers).", file = infile)
     async with server:
         await server.serve_forever()
 
@@ -161,4 +167,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nServer stopped.")
+        Log.print(string = "Server stopped.", file = infile)
